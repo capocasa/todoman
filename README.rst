@@ -1,6 +1,14 @@
 Todoman
 =======
 
+.. warning::
+
+   This is an experimental branch that adds VALARM alarm support (``-a``/``--alarm``
+   flag for ``new`` and ``edit`` commands). It is not part of the official todoman
+   project. Use at your own risk.
+
+
+
 `CI status <https://builds.sr.ht/~whynothugo/todoman/commits/main>`_
 | `Coverage <https://codecov.io/gh/pimutils/todoman>`_
 | `Documentation <https://todoman.rtfd.org/>`_
