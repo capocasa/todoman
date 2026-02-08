@@ -193,6 +193,15 @@ class DefaultFormatter(Formatter):
         if todo.location:
             extra_lines.append(self._format_multiline("Location", todo.location))
 
+        if todo.alarm is not None:
+            if todo.alarm == 0:
+                alarm_text = "at due time"
+            elif todo.alarm == 1:
+                alarm_text = "1 minute before due"
+            else:
+                alarm_text = f"{todo.alarm} minutes before due"
+            extra_lines.append(self._format_multiline("Alarm", alarm_text))
+
         return f"{self.compact(todo)}{''.join(extra_lines)}"
 
     # FIXME: cannot return `int`, but porcelain subclasses this (it shouldn't)
@@ -313,6 +322,7 @@ class PorcelainFormatter(DefaultFormatter):
             "description": todo.description,
             "completed_at": self.format_datetime(todo.completed_at),
             "recurring": todo.is_recurring,
+            "alarm": todo.alarm,
         }
 
     def compact(self, todo: Todo) -> str:

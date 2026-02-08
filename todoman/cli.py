@@ -205,7 +205,32 @@ def validate_status(ctx: AppContext, param: click.Parameter, val: str) -> str:
     return val
 
 
+def _validate_alarm_param(
+    ctx: click.Context,
+    param: click.Parameter,
+    val: str,
+) -> int | str | None:
+    if val is None or val == "":
+        return None
+    if val.lower() == "none":
+        return "none"
+    try:
+        n = int(val)
+    except ValueError:
+        raise click.BadParameter("Must be a non-negative integer or 'none'") from None
+    if n < 0:
+        raise click.BadParameter("Must be a non-negative integer or 'none'")
+    return n
+
+
 def _todo_property_options(command: Callable) -> Callable:
+    click.option(
+        "--alarm",
+        "-a",
+        default="",
+        callback=_validate_alarm_param,
+        help="Alarm (minutes before due). Use 'none' to remove.",
+    )(command)
     click.option(
         "--category",
         "-c",
@@ -246,6 +271,7 @@ def _todo_property_options(command: Callable) -> Callable:
         # longform is singular since user can pass it multiple times, but
         # in actuality it's plural, so manually changing for #cache.todos.
         kw["todo_properties"]["categories"] = kw.pop("category")
+        kw["todo_properties"]["alarm"] = kw.pop("alarm")
 
         return command(*a, **kw)
 
@@ -447,9 +473,12 @@ def new(
     if default_priority is not None:
         todo.priority = default_priority
 
+    alarm = todo_properties.pop("alarm")
     for key, value in todo_properties.items():
         if value is not None:
             setattr(todo, key, value)
+    if isinstance(alarm, int):
+        todo.alarm = alarm
     todo.summary = " ".join(summary)
 
     if read_description:
@@ -505,11 +534,18 @@ def edit(
         return
     old_list = todo.list
 
+    alarm = todo_properties.pop("alarm")
     changes = False
     for key, value in todo_properties.items():
         if value is not None and value != []:
             changes = True
             setattr(todo, key, value)
+    if alarm == "none":
+        changes = True
+        todo.alarm = None
+    elif isinstance(alarm, int):
+        changes = True
+        todo.alarm = alarm
 
     if read_description:
         changes = True

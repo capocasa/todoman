@@ -42,6 +42,7 @@ def test_list_all(tmpdir: py.path.local, runner: CliRunner, create: Callable) ->
             "recurring": False,
             "start": 1451606400,
             "summary": "Do stuff",
+            "alarm": None,
         }
     ]
 
@@ -80,6 +81,7 @@ def test_list_start_date(
             "recurring": False,
             "start": 1451692800,
             "summary": "Do stuff",
+            "alarm": None,
         }
     ]
 
@@ -116,6 +118,7 @@ def test_list_due_date(
             "recurring": False,
             "start": None,
             "summary": "Do stuff",
+            "alarm": None,
         }
     ]
 
@@ -146,6 +149,7 @@ def test_list_nodue(tmpdir: py.path.local, runner: CliRunner, create: Callable) 
             "priority": 4,
             "start": None,
             "summary": "Do stuff",
+            "alarm": None,
         }
     ]
 
@@ -218,6 +222,7 @@ def test_show(tmpdir: py.path.local, runner: CliRunner, create: Callable) -> Non
         "recurring": False,
         "start": None,
         "summary": "harhar",
+        "alarm": None,
     }
 
     assert not result.exception
@@ -243,6 +248,7 @@ def test_simple_action(todo_factory: Callable) -> None:
         "recurring": False,
         "start": None,
         "summary": "YARR!",
+        "alarm": None,
     }
 
     assert formatter.simple_action("Delete", todo) == json.dumps(

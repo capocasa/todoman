@@ -57,6 +57,7 @@ class Todo:
     rrule: str | None
     start: date | None
     id: int | None
+    alarm: int | None
 
     def __init__(
         self,
@@ -98,6 +99,7 @@ class Todo:
         self.start = None
         self.status = "NEEDS-ACTION"
         self.summary = ""
+        self.alarm = None
 
         self.filename = filename or f"{self.uid}.ics"
         self.related = []
@@ -125,6 +127,8 @@ class Todo:
 
         for field in fields:
             setattr(todo, field, getattr(self, field))
+
+        todo.alarm = self.alarm
 
         return todo
 
@@ -364,6 +368,21 @@ class VtodoWriter:
                     logger.debug("Setting field %s to %s.", target, value)
                     self.vtodo.add(target, value)
 
+        # Handle VALARM subcomponents
+        self.vtodo.subcomponents = [
+            c for c in self.vtodo.subcomponents if c.name != "VALARM"
+        ]
+        if self.todo.alarm is not None:
+            alarm = icalendar.Alarm()
+            alarm.add("action", "DISPLAY")
+            alarm.add("description", "Task due")
+            alarm.add(
+                "trigger",
+                timedelta(minutes=-self.todo.alarm),
+                parameters={"RELATED": "END"},
+            )
+            self.vtodo.subcomponents.append(alarm)
+
         return self.vtodo
 
     def _read(self, path: str) -> icalendar.Todo:
@@ -422,7 +441,7 @@ class Cache:
     may be used for filtering/sorting.
     """
 
-    SCHEMA_VERSION = 10
+    SCHEMA_VERSION = 11
 
     def __init__(self, path: str) -> None:
         self.cache_path = str(path)
@@ -533,6 +552,7 @@ class Cache:
                 "sequence" INTEGER,
                 "last_modified" INTEGER,
                 "rrule" TEXT,
+                "alarm" INTEGER,
 
                 FOREIGN KEY(file_path) REFERENCES files(path) ON DELETE CASCADE
             );
@@ -646,6 +666,22 @@ class Cache:
 
         return rrule.to_ical().decode()
 
+    @staticmethod
+    def _extract_alarm_minutes(todo: icalendar.Todo) -> int | None:
+        """Extract alarm minutes-before-due from a VTODO's VALARM subcomponents."""
+        for component in todo.subcomponents:
+            if component.name != "VALARM":
+                continue
+            trigger = component.get("trigger")
+            if trigger is None:
+                continue
+            dt = trigger.dt
+            if isinstance(dt, timedelta):
+                total_seconds = int(dt.total_seconds())
+                # Negative means before due; convert to positive minutes
+                return max(0, -total_seconds) // 60
+        return None
+
     def add_vtodo(
         self,
         todo: icalendar.Todo,
@@ -677,9 +713,10 @@ class Cache:
                 location,
                 sequence,
                 last_modified,
-                rrule
+                rrule,
+                alarm
             ) VALUES ({}?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?)
+                ?, ?)
             """
 
         due, due_dt = self._serialize_datetime(todo, "due")
@@ -687,6 +724,8 @@ class Cache:
 
         if start and due:
             start = None if start >= due else start
+
+        alarm = self._extract_alarm_minutes(todo)
 
         params = [
             file_path,
@@ -707,6 +746,7 @@ class Cache:
             todo.get("sequence", 1),
             self._serialize_datetime(todo, "last-modified")[0],
             self._serialize_rrule(todo, "rrule"),
+            alarm,
         ]
 
         if id:
@@ -917,6 +957,7 @@ class Cache:
         todo.list = self.lists_map[row["list_name"]]
         todo.filename = os.path.basename(row["path"])
         todo.rrule = row["rrule"]
+        todo.alarm = row["alarm"]
         return todo
 
     def lists(self) -> Iterator[TodoList]:
