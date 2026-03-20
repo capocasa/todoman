@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
+import shutil
 import socket
 import sqlite3
 import tempfile
@@ -287,8 +288,16 @@ def atomic_write(
         if overwrite:
             os.rename(src, dest)
         else:
-            os.link(src, dest)
-            os.unlink(src)
+            # Use hard link if available, fall back to copy for Android/Termux
+            if hasattr(os, 'link'):
+                os.link(src, dest)
+                os.unlink(src)
+            else:
+                if os.path.exists(dest):
+                    os.unlink(src)
+                    raise FileExistsError(f"File exists: {dest}")
+                shutil.copy2(src, dest)
+                os.unlink(src)
 
 
 class VtodoWriter:
